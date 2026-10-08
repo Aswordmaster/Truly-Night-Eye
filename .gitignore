@@ -1,0 +1,12 @@
+/build/
+/output/
+/dist/
+/vcpkg_installed/
+/CMakeUserPresets.json
+__pycache__/
+*.pyc
+*.pdb
+*.log
+*.dmp
+Settings.json
+ShaderCache/
