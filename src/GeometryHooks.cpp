@@ -30,6 +30,8 @@ namespace night_eye
 		bool installed = false;
 		bool menuFailureLogged = false;
 		bool frameFailureLogged = false;
+		bool menuTargetLogged = false;
+		bool previousMenuRedirected = false;
 
 		struct OutputMergerState
 		{
@@ -120,6 +122,34 @@ namespace night_eye
 				BindGeometry(pass);
 		}
 
+		ComPtr<ID3D11RenderTargetView> GetRedirectedMenuTarget(const D3D11_TEXTURE2D_DESC& backBufferDescription, ID3D11Texture2D* backBuffer)
+		{
+			auto* renderer = RE::BSGraphics::Renderer::GetSingleton();
+			if (!renderer)
+				return {};
+			const auto& framebuffer = renderer->GetRuntimeData().renderTargets[RE::RENDER_TARGETS::kFRAMEBUFFER];
+			ComPtr<ID3D11RenderTargetView> target = reinterpret_cast<ID3D11RenderTargetView*>(framebuffer.RTV);
+			if (!target)
+				return {};
+			ComPtr<ID3D11Resource> resource;
+			target->GetResource(resource.GetAddressOf());
+			// HDR redirects the RTV independently of the optional framebuffer texture.
+			if (!resource || resource.Get() == backBuffer || resource.Get() == reinterpret_cast<ID3D11Resource*>(framebuffer.texture))
+				return {};
+			ComPtr<ID3D11Texture2D> texture;
+			if (FAILED(resource.As(&texture)))
+				return {};
+			D3D11_TEXTURE2D_DESC description{};
+			texture->GetDesc(&description);
+			D3D11_RENDER_TARGET_VIEW_DESC viewDescription{};
+			target->GetDesc(&viewDescription);
+			if (viewDescription.ViewDimension != D3D11_RTV_DIMENSION_TEXTURE2D || viewDescription.Texture2D.MipSlice != 0 ||
+				description.SampleDesc.Count != 1 || description.ArraySize != 1 ||
+				description.Width != backBufferDescription.Width || description.Height != backBufferDescription.Height)
+				return {};
+			return target;
+		}
+
 		void DrawMenu(IDXGISwapChain* swapChain)
 		{
 			if (!menu::IsOpen())
@@ -127,15 +157,33 @@ namespace night_eye
 			ComPtr<ID3D11Texture2D> backBuffer;
 			ComPtr<ID3D11RenderTargetView> target;
 			auto result = swapChain->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf()));
-			if (SUCCEEDED(result))
-				result = device->CreateRenderTargetView(backBuffer.Get(), nullptr, target.GetAddressOf());
+			if (SUCCEEDED(result) && !backBuffer)
+				result = E_POINTER;
+			D3D11_TEXTURE2D_DESC description{};
+			bool redirected = false;
+			if (SUCCEEDED(result)) {
+				backBuffer->GetDesc(&description);
+				target = GetRedirectedMenuTarget(description, backBuffer.Get());
+				redirected = target != nullptr;
+				if (!target) {
+					result = device->CreateRenderTargetView(backBuffer.Get(), nullptr, target.GetAddressOf());
+					if (SUCCEEDED(result))
+						SetResourceName(target.Get(), "NightEye::MenuTarget RTV");
+				}
+			}
 			if (FAILED(result)) {
 				if (!menuFailureLogged)
 					SKSE::log::error("Night Eye menu target unavailable, HRESULT {:08X}.", static_cast<std::uint32_t>(result));
 				menuFailureLogged = true;
 				return;
 			}
-			SetResourceName(target.Get(), "NightEye::MenuTarget RTV");
+			if (!menuTargetLogged || previousMenuRedirected != redirected) {
+				D3D11_RENDER_TARGET_VIEW_DESC targetDescription{};
+				target->GetDesc(&targetDescription);
+				SKSE::log::info("Night Eye menu target: {}, {}x{}, RTV format {}.", redirected ? "redirected framebuffer UI" : "swapchain backbuffer", description.Width, description.Height, static_cast<unsigned int>(targetDescription.Format));
+				menuTargetLogged = true;
+				previousMenuRedirected = redirected;
+			}
 			OutputMergerState saved(context.Get());
 			auto* view = target.Get();
 			context->OMSetRenderTargets(1, &view, nullptr);

@@ -208,9 +208,21 @@ int main()
 		auto failureFallback = Compile(sourcePath.native(), failureFallbackIncludes);
 		Require(BlobHash(failureBaseline.Get()) == BlobHash(failureFallback.Get()) && night_eye::GetCompilerState().fallbacks == beforeFailure.fallbacks + 1,
 			"Invalid adaptation did not recover with exact original bytecode");
+		Require(night_eye::IsGeometryAdapterSupported(RE::BSShader::Type::Lighting), "Failed variant disabled geometry binding for valid recognized Lighting variants");
+		Require(night_eye::IsGeometryAdapterSupported(RE::BSShader::Type::Effect), "Failed Lighting adaptation incorrectly disabled the recognized Effect family");
 		activeRecipe->insertions.front().body = originalBody;
 		night_eye::sourceCache.clear();
+		TrackingIncludes recoveredIncludes;
+		auto recovered = Compile(sourcePath.native(), recoveredIncludes);
+		const auto recoveredBindings = Bindings(recovered.Get());
+		Require(std::ranges::any_of(recoveredBindings, [](const auto& item) {
+			return item.at("name") == "NightEyeStandalone::GeometryParameters" &&
+				item.at("type") == D3D_SIT_CBUFFER && item.at("slot") == 13 && item.at("bytes") == 96;
+		}), "Recovered adaptation lost its b13 geometry buffer contract");
+		Require(night_eye::IsGeometryAdapterSupported(RE::BSShader::Type::Lighting), "Recovered Lighting adaptation cannot receive fresh geometry bindings");
 		report["adaptationFailureFallsBackByteIdentical"] = true;
+		report["adaptationFailurePreservesBindingsForValidRecognizedVariants"] = true;
+		report["adaptationRetryRecoversGeometryBufferContract"] = true;
 		report["passed"] = true;
 		report["status"] = night_eye::GetCompilerStatus();
 		std::ofstream("CompilerHarnessValidation.json") << report.dump(2) << '\n';

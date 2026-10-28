@@ -9,11 +9,11 @@ namespace night_eye
 {
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 		Settings, enabled, exposure, gamma, shadowLift, tintColor, tintAmount,
-		glow, vignette, grain, transitionSeconds, eyeshineAmount, eyeshineColor,
+		glow, removeNightEyeBlur, vignette, grain, transitionSeconds, eyeshineAmount, eyeshineColor,
 		customVFX, customAmount, anaglyphEnabled, anaglyphAmount, anaglyphHorizontal,
 		anaglyphVertical, anaglyphDesaturation, anaglyphLeftColor, anaglyphRightColor,
 		anaglyphSwap, visionMode, actorVisionAmount, actorVisionBrightness, enemyColor,
-		allyColor, neutralColor, menuKey, language)
+		allyColor, neutralColor, menuKey, menuScale, language)
 
 	namespace
 	{
@@ -46,7 +46,8 @@ namespace night_eye
 			ScalarRange{ &Settings::anaglyphVertical, limits::Separation },
 			ScalarRange{ &Settings::anaglyphDesaturation, limits::Unit },
 			ScalarRange{ &Settings::actorVisionAmount, limits::Unit },
-			ScalarRange{ &Settings::actorVisionBrightness, limits::ActorBrightness }
+			ScalarRange{ &Settings::actorVisionBrightness, limits::ActorBrightness },
+			ScalarRange{ &Settings::menuScale, limits::MenuScale }
 		};
 
 		void Sanitize(Settings& settings)

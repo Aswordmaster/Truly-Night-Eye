@@ -7,6 +7,7 @@
 #include <CommCtrl.h>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 
@@ -22,6 +23,9 @@ namespace night_eye::menu
 		constexpr std::size_t kMaximumInputMessages = 512;
 		constexpr float kInitialWidth = 650.0f;
 		constexpr float kInitialHeight = 720.0f;
+		constexpr float kReferenceWidth = 1920.0f;
+		constexpr float kReferenceHeight = 1080.0f;
+		constexpr limits::Range kResolutionScale{ 0.75f, 3.0f };
 		constexpr std::array kShortcutKeys{ VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12 };
 		constexpr std::array kMouseKeys{ VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2 };
 		constexpr REX::EnumSet<RE::ControlMap::UEFlag, std::uint32_t> kBlockedControls{
@@ -50,6 +54,9 @@ namespace night_eye::menu
 		{
 			std::recursive_mutex mutex;
 			ImGuiContext* imgui = nullptr;
+			ImGuiStyle baseStyle;
+			ImVec2 displaySize{};
+			float scale = 0.0f;
 			HWND window = nullptr;
 			ID3D11DeviceContext* context = nullptr;
 			std::atomic<bool> open = false;
@@ -255,6 +262,40 @@ namespace night_eye::menu
 			return ImGui::SliderFloat(T(key, fallback), &value, range.minimum, range.maximum, format);
 		}
 
+		bool UpdateMenuScale(float multiplier, const ImVec2& displaySize)
+		{
+			const float resolutionScale = std::clamp(std::min(displaySize.x / kReferenceWidth, displaySize.y / kReferenceHeight),
+				kResolutionScale.minimum, kResolutionScale.maximum);
+			const float scale = resolutionScale * multiplier;
+			const bool changed = state.scale != scale || state.displaySize.x != displaySize.x || state.displaySize.y != displaySize.y;
+			if (state.scale != scale) {
+				auto& style = ImGui::GetStyle();
+				style = state.baseStyle;
+				style.ScaleAllSizes(scale);
+				style.FontScaleMain = state.baseStyle.FontScaleMain * scale;
+				state.scale = scale;
+			}
+			state.displaySize = displaySize;
+			return changed;
+		}
+
+		void ConfigureMenuWindow(bool layoutChanged)
+		{
+			const auto viewport = ImGui::GetMainViewport();
+			const auto& style = ImGui::GetStyle();
+			const ImVec2 maximumSize{
+				std::max(style.WindowMinSize.x, viewport->WorkSize.x - 2.0f * style.DisplayWindowPadding.x),
+				std::max(style.WindowMinSize.y, viewport->WorkSize.y - 2.0f * style.DisplayWindowPadding.y)
+			};
+			ImGui::SetNextWindowSizeConstraints(style.WindowMinSize, maximumSize);
+			if (layoutChanged) {
+				ImGui::SetNextWindowSize({ std::min(kInitialWidth * state.scale, maximumSize.x),
+					std::min(kInitialHeight * state.scale, maximumSize.y) });
+				ImGui::SetNextWindowPos({ viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+					viewport->WorkPos.y + viewport->WorkSize.y * 0.5f }, ImGuiCond_Always, { 0.5f, 0.5f });
+			}
+		}
+
 		void DrawGeometryStatus()
 		{
 			const auto compiler = GetCompilerState();
@@ -281,6 +322,8 @@ namespace night_eye::menu
 					ImGui::ColorEdit3(T("tint_color", "Tint Color"), settings.tintColor.data());
 					Slider("tint_amount", "Tint Amount", settings.tintAmount, limits::Unit);
 					Slider("glow", "Glow", settings.glow, limits::Unit);
+					ImGui::Checkbox(T("remove_night_eye_blur", "Remove Night Eye Blur"), &settings.removeNightEyeBlur);
+					ImGui::TextWrapped("%s", T("remove_night_eye_blur_description", "Removes Skyrim's Night Eye blur and radial blur. Reactivate Night Eye after changing this option. Glow is controlled separately."));
 					Slider("vignette", "Vignette", settings.vignette, limits::Unit);
 					Slider("grain", "Grain", settings.grain, limits::Grain, "%.3f");
 					ImGui::EndTabItem();
@@ -332,6 +375,8 @@ namespace night_eye::menu
 					ImGui::EndTabItem();
 				}
 				if (ImGui::BeginTabItem(T("tab.menu", "Menu"))) {
+					Slider("menu_scale", "Menu Scale", settings.menuScale, limits::MenuScale, "%.2fx");
+					ImGui::TextWrapped("%s", T("menu_scale_description", "Scales the menu for the display resolution. This multiplier adjusts text and controls together."));
 					const auto shortcutName = [](int key) { return std::format("F{}", key - VK_F1 + 1); };
 					if (ImGui::BeginCombo(T("menu_key", "Menu Shortcut"), shortcutName(static_cast<int>(settings.menuKey)).c_str())) {
 						for (const auto key : kShortcutKeys) {
@@ -416,6 +461,7 @@ namespace night_eye::menu
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NoMouseCursorChange;
 		io.ConfigInputTrickleEventQueue = false;
 		ImGui::StyleColorsDark();
+		state.baseStyle = ImGui::GetStyle();
 		if (!ImGui_ImplWin32_Init(window) || !ImGui_ImplDX11_Init(device, context)) {
 			SKSE::log::error("Night Eye menu backend initialization failed");
 			if (io.BackendPlatformUserData)
@@ -470,6 +516,10 @@ namespace night_eye::menu
 		state.inputMessages.clear();
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
+		if (io.DisplaySize.x <= 0.0f || io.DisplaySize.y <= 0.0f ||
+			!std::isfinite(io.DisplaySize.x) || !std::isfinite(io.DisplaySize.y))
+			return;
+		const bool layoutChanged = UpdateMenuScale(settings.menuScale, io.DisplaySize);
 		for (std::size_t button = 0; button < kMouseKeys.size(); ++button)
 			io.AddMouseButtonEvent(static_cast<int>(button), (GetAsyncKeyState(kMouseKeys[button]) & 0x8000) != 0);
 		if (const auto wheel = state.wheel.exchange(0.0f); wheel != 0.0f)
@@ -478,7 +528,7 @@ namespace night_eye::menu
 		ImGui::NewFrame();
 		if (settings.language != state.language)
 			LoadTranslations(settings.language);
-		ImGui::SetNextWindowSize({ kInitialWidth, kInitialHeight }, ImGuiCond_FirstUseEver);
+		ConfigureMenuWindow(layoutChanged);
 		bool open = state.open.load();
 		if (ImGui::Begin(T("window.title", "Truly Night Eye"), &open)) {
 			DrawControls(settings);

@@ -44,6 +44,28 @@
         { "anchor": "\tfloat4 finalColor = float4(blendedColor, alpha);", "asset": "EffectEyes.hlsli", "after": false },
         { "anchor": "\tpsout.Albedo = float4(auxiliaryColor * !(Permutation::VertexShaderDescriptor & Permutation::EffectFlags::SkyObject), finalColor.w);", "asset": "EffectAlbedo.hlsli", "after": true }
       ]
+    },
+    {
+      "version": "Community Shaders 1.9.1",
+      "family": "Lighting",
+      "sourceSHA256": "41246cb43a9f05e69c8d69934db0ae31e11866bec97cbba9de84718150ed8263",
+      "os217": false,
+      "insertions": [
+        { "anchor": "PS_OUTPUT main(PS_INPUT input", "asset": "Declarations.hlsli", "after": false },
+        { "anchor": "\tfloat3 outputAlbedo = indirectLobeWeights.diffuse * vertexColor.xyz;", "asset": "Lighting.hlsli", "after": false }
+      ]
+    },
+    {
+      "version": "Community Shaders 1.9.1",
+      "family": "Effect",
+      "sourceSHA256": "a66be78b160cf11a7e7ac96f421b72e902c3feee0a414fa3061882b602fdf4e9",
+      "os217": false,
+      "insertions": [
+        { "anchor": "PS_OUTPUT main(PS_INPUT input", "asset": "Declarations.hlsli", "after": false },
+        { "anchor": "#\tif !defined(MOTIONVECTORS_NORMALS)\n\tfloat fogFactor = Color::FogAlpha(input.FogParam.w);", "asset": "EffectActor.hlsli", "after": false },
+        { "anchor": "\talpha = Color::EffectAlpha(alpha);", "asset": "EffectEyes.hlsli", "after": true },
+        { "anchor": "\tpsout.Albedo = float4(psout.Diffuse.xyz * !(Permutation::VertexShaderDescriptor & Permutation::EffectFlags::SkyObject), finalColor.w);", "asset": "EffectAlbedo.hlsli", "after": true }
+      ]
     }
   ]
 }

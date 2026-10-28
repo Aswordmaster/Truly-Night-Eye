@@ -11,6 +11,7 @@ namespace night_eye
 		std::array<float, 3> tintColor{ 0.55f, 0.75f, 1.0f };
 		float tintAmount = 0.0f;
 		float glow = 0.0f;
+		bool removeNightEyeBlur = false;
 		float vignette = 0.0f;
 		float grain = 0.0f;
 		float transitionSeconds = 0.2f;
@@ -33,6 +34,7 @@ namespace night_eye
 		std::array<float, 3> allyColor{ 0.02f, 1.0f, 0.05f };
 		std::array<float, 3> neutralColor{ 0.7f, 0.7f, 0.7f };
 		unsigned int menuKey = VK_F10;
+		float menuScale = 1.0f;
 		std::string language = "en";
 	};
 

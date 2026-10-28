@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace night_eye
 {
@@ -15,12 +16,102 @@ namespace night_eye
 		std::atomic<std::shared_ptr<const Affiliations>> affiliations;
 		std::shared_ptr<const Affiliations> frameAffiliations;
 		std::vector<const RE::EffectSetting*> effects;
+		std::vector<const RE::TESImageSpaceModifier*> nightEyeModifiers;
 		std::atomic<bool> active{ false };
 		std::atomic<bool> queryPending{ false };
+		std::atomic<bool> nativeBlurDesired{ false };
+		std::atomic<bool> nativeBlurApplied{ false };
+		std::atomic<bool> nativeBlurPending{ false };
+		struct NativeBlurCurve
+		{
+			RE::NiPointer<RE::NiFloatInterpolator>* field;
+			RE::NiPointer<RE::NiFloatInterpolator> original;
+			RE::NiPointer<RE::NiFloatInterpolator> replacement;
+		};
+		std::vector<NativeBlurCurve> nativeBlurCurves;
 		Settings frameSettings;
 		float activation = 0.0f;
 		float elapsed = 0.0f;
 		float queryElapsed = kQueryInterval;
+
+		void CacheNativeBlurCurve(RE::NiPointer<RE::NiFloatInterpolator>& field, RE::FormID formId)
+		{
+			if (!field)
+				return;
+			RE::NiPointer<RE::NiObject> cloned{ field->Clone() };
+			auto* replacement = cloned ? netimmerse_cast<RE::NiFloatInterpolator*>(cloned.get()) : nullptr;
+			if (!replacement || replacement == field.get()) {
+				SKSE::log::warn("Night Eye modifier {:08X} blur curve could not be cloned; leaving it unchanged.", formId);
+				return;
+			}
+			replacement->floatData.reset();
+			replacement->floatValue = 0.0f;
+			replacement->lastTime = std::numeric_limits<float>::lowest();
+			replacement->lastIndex = 0;
+			nativeBlurCurves.push_back({ &field, field, RE::NiPointer<RE::NiFloatInterpolator>{ replacement } });
+		}
+
+		void InitializeNightEyeModifiers(RE::TESDataHandler& handler)
+		{
+			struct ModifierForm
+			{
+				RE::FormID localId;
+				bool activatesNightEye;
+			};
+			constexpr std::array forms{ ModifierForm{ 0x6B108, true }, ModifierForm{ 0x6B10A, true }, ModifierForm{ 0x6B10B, false } };
+			for (const auto& form : forms) {
+				auto* modifier = handler.LookupForm<RE::TESImageSpaceModifier>(form.localId, "Skyrim.esm");
+				if (!modifier) {
+					SKSE::log::warn("Night Eye modifier {:08X} is unavailable; visual detection and blur control skipped.", form.localId);
+					continue;
+				}
+				if (form.activatesNightEye)
+					nightEyeModifiers.push_back(modifier);
+				for (auto* field : { &modifier->blurRadius, &modifier->radialBlur.strength })
+					CacheNativeBlurCurve(*field, modifier->GetFormID());
+			}
+		}
+
+		bool HasActiveNightEyeModifier()
+		{
+			auto* world = RE::TES::GetSingleton();
+			if (!world)
+				return false;
+			for (const auto& instance : world->activeImageSpaceModifiers) {
+				if (!instance || !std::isfinite(instance->strength) || instance->strength <= 0.0f)
+					continue;
+				const auto* form = instance->IsForm();
+				if (form && std::ranges::find(nightEyeModifiers, form->imod) != nightEyeModifiers.end())
+					return true;
+			}
+			return false;
+		}
+
+		void ApplyNativeBlur(bool remove)
+		{
+			for (auto& curve : nativeBlurCurves) {
+				if (remove) {
+					if (curve.field->get() == curve.original.get())
+						*curve.field = curve.replacement;
+				} else if (curve.field->get() == curve.replacement.get()) {
+					*curve.field = curve.original;
+				}
+			}
+			nativeBlurApplied.store(remove, std::memory_order_release);
+		}
+
+		void RequestNativeBlur(bool remove)
+		{
+			nativeBlurDesired.store(remove, std::memory_order_release);
+			if (nativeBlurApplied.load(std::memory_order_acquire) == remove)
+				return;
+			if (auto* tasks = SKSE::GetTaskInterface(); tasks && !nativeBlurPending.exchange(true)) {
+				tasks->AddTask([] {
+					ApplyNativeBlur(nativeBlurDesired.load(std::memory_order_acquire));
+					nativeBlurPending.store(false, std::memory_order_release);
+				});
+			}
+		}
 
 		class EffectVisitor : public RE::MagicTarget::ForEachActiveEffectVisitor
 		{
@@ -48,6 +139,7 @@ namespace night_eye
 			if (player && player->GetParentCell() && !loading) {
 				if (auto* target = player->GetMagicTarget())
 					target->VisitEffects(visitor);
+				visitor.found = visitor.found || HasActiveNightEyeModifier();
 			}
 			std::shared_ptr<const Affiliations> snapshot;
 			if (visitor.found && actorVision) {
@@ -91,7 +183,12 @@ namespace night_eye
 				if (auto* effect = handler->LookupForm<RE::EffectSetting>(form.localId, form.plugin))
 					effects.push_back(effect);
 			}
+			InitializeNightEyeModifiers(*handler);
 		}
+		const auto settings = GetSettings();
+		const bool removeBlur = settings.enabled && settings.removeNightEyeBlur;
+		nativeBlurDesired.store(removeBlur, std::memory_order_release);
+		ApplyNativeBlur(removeBlur);
 		InitializeRenderer();
 	}
 
@@ -107,6 +204,7 @@ namespace night_eye
 		const float frameDelta = RE::GetSecondsSinceLastFrame();
 		const float delta = std::isfinite(frameDelta) ? std::clamp(frameDelta, 0.0f, kMaximumFrameStep) : 0.0f;
 		frameSettings = GetSettings();
+		RequestNativeBlur(frameSettings.enabled && frameSettings.removeNightEyeBlur);
 		auto* ui = RE::UI::GetSingleton();
 		const bool blocked = ui && (ui->IsMenuOpen(RE::MainMenu::MENU_NAME) || ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME) ||
 									   ui->IsMenuOpen(RE::MapMenu::MENU_NAME) || ui->IsMenuOpen(RE::StatsMenu::MENU_NAME));

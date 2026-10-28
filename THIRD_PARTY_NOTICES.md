@@ -11,8 +11,11 @@ copyright notices and modding permissions are retained. Shader-derived code
 also retains the MIT notice, copyright 2022 Ilya Perapechka, in
 [LICENSES/CommunityShaders-Shaders-MIT.txt](LICENSES/CommunityShaders-Shaders-MIT.txt).
 
-Third-party libraries retain their own MIT or BSD licences. Their notices
-are included in [LICENSES](LICENSES). Build dependencies are pinned in
+CommonLibSSE-NG 11.0.0 uses GPL-3.0-or-later with its own modding and linking
+permissions, retained in [LICENSES/CommonLibSSE-NG-11.0.0.txt](LICENSES/CommonLibSSE-NG-11.0.0.txt).
+Its original MIT attribution and the BSD notice for the hde64 instruction
+decoder are also retained. Other libraries retain their own MIT or BSD licences.
+Their notices are included in [LICENSES](LICENSES). Build dependencies are pinned in
 `CMakeLists.txt` and `vcpkg.json`; see [BUILDING.md](BUILDING.md).
 
 The eyeshine textures are generated monochrome region masks. Their editable

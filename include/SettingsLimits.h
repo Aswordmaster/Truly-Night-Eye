@@ -16,5 +16,6 @@ namespace night_eye::limits
 	inline constexpr Range Eyeshine{ 0.0f, 8.0f };
 	inline constexpr Range Separation{ -32.0f, 32.0f };
 	inline constexpr Range ActorBrightness{ 0.0f, 4.0f };
+	inline constexpr Range MenuScale{ 0.75f, 2.0f };
 	inline constexpr int MaximumVisionMode = 2;
 }

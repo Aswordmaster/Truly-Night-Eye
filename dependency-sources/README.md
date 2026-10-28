@@ -9,17 +9,23 @@ port tree. Archives were verified against the installed packages' source
 records before copying or repacking them.
 
 The bundle includes Detours, DirectXMath, DirectXTK, fmt, ImGui, nlohmann-json,
-spdlog, Xbyak, rapidcsv, CommonLibSSE-NG, and OpenVR. Each `*-vcpkg-port.zip`
+spdlog, Xbyak, rapidcsv, CommonLibSSE-NG, OpenVR, and MinHook's hde64 decoder. Each `*-vcpkg-port.zip`
 contains that library's original port files, including its build instructions
 and patches. The baseline is
 `dddca6fa87f177e0678e2545c4b4636a44aa05bd`.
 
-CommonLibSSE-NG is version 4.26.1, commit
-`8f4205da56f01cbe98557422c008a5719c180fb9`. Its source snapshot includes its
-build scripts. The separate OpenVR source snapshot is the matching submodule
-commit `ebdea152f8aac77e9a6db29682b81d762159df7e`; it includes all library
-sources, headers, root build files, and license. Extract its contents into
-CommonLibSSE-NG's `extern/openvr` directory if building these snapshots.
+The current build pins CommonLibSSE-NG 11.0.0, commit
+`94faaed0c60eddd8347767f2d4d29a97c93bde8c`. Its source snapshot includes the
+build scripts, GPL text, modding permissions, and original third-party notices.
+The matching OpenVR submodule is commit `60eb187801956ad277f1cae6680e3a410ee0873b`.
+Its separate snapshot includes library sources, headers, root build files, and
+license; extract it into CommonLibSSE-NG's `extern/openvr` directory when building
+from these snapshots. MinHook 1.3.4, commit `c3fcafdc10146beb5919319d0683e44e3c30d537`,
+provides the hde64 decoder used by CommonLibSSE-NG's trampoline checks.
+
+The earlier CommonLibSSE-NG 4.26.1 and OpenVR `ebdea152` snapshots are retained
+for the initially distributed 1.0 DLL. The manifest records both dependency
+generations without removing their source or notices.
 
 The installed DirectXMath package is labelled `2026-03-12`, while its consumed
 source revision is `apr2025`. The pinned port explicitly selects that revision;

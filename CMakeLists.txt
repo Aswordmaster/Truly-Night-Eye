@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.25)
-project(NightEye VERSION 1.0.0 LANGUAGES CXX)
+project(NightEye VERSION 1.4.0 LANGUAGES CXX)
+
+if(NOT PROJECT_VERSION_TWEAK)
+    set(PROJECT_VERSION_TWEAK 0)
+endif()
+set(NIGHT_EYE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}")
 
 if(NOT WIN32 OR NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Night Eye requires a Windows x64 Visual Studio build.")
@@ -21,15 +26,15 @@ find_path(DETOURS_INCLUDE_DIR NAMES detours/detours.h REQUIRED)
 
 include(FetchContent)
 set(BUILD_TESTS OFF CACHE BOOL "Build CommonLibSSE tests" FORCE)
-set(ENABLE_SKYRIM_SE ON CACHE BOOL "Match the CommonLibSSE bundle layout" FORCE)
-set(ENABLE_SKYRIM_AE ON CACHE BOOL "Match the CommonLibSSE bundle layout" FORCE)
-set(ENABLE_SKYRIM_VR ON CACHE BOOL "Match the CommonLibSSE bundle layout" FORCE)
+set(ENABLE_SKYRIM_SE ON CACHE BOOL "Enable the CommonLibSSE SE layout" FORCE)
+set(ENABLE_SKYRIM_AE ON CACHE BOOL "Enable the CommonLibSSE AE layout" FORCE)
+set(ENABLE_SKYRIM_VR ON CACHE BOOL "Enable the CommonLibSSE VR layout" FORCE)
 set(SKSE_SUPPORT_XBYAK ON CACHE BOOL "Enable CommonLibSSE trampoline support" FORCE)
-set(COMMONLIB_PREBUILT ON CACHE BOOL "Download the verified CommonLibSSE Release bundle")
-set(COMMONLIB_PREBUILT_MULTICONFIG ON CACHE BOOL "Use the Release-only bundle" FORCE)
+set(COMMONLIB_PREBUILT OFF CACHE BOOL "Build CommonLibSSE against the pinned dependencies" FORCE)
+set(COMMONLIB_PREBUILT_MULTICONFIG OFF CACHE BOOL "Build CommonLibSSE against the pinned dependencies" FORCE)
 FetchContent_Declare(CommonLibSSE
-    GIT_REPOSITORY https://github.com/alandtse/CommonLibVR.git
-    GIT_TAG 8f4205da56f01cbe98557422c008a5719c180fb9)
+    GIT_REPOSITORY https://github.com/alandtse/CommonLibSSE-NG.git
+    GIT_TAG 94faaed0c60eddd8347767f2d4d29a97c93bde8c)
 FetchContent_MakeAvailable(CommonLibSSE)
 
 file(GLOB NIGHT_EYE_SOURCES CONFIGURE_DEPENDS "src/*.cpp")
@@ -41,7 +46,8 @@ target_compile_definitions(NightEye PRIVATE
     WINVER=0x0601 _WIN32_WINNT=0x0601 WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE
     NIGHT_EYE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     NIGHT_EYE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-    NIGHT_EYE_VERSION_PATCH=${PROJECT_VERSION_PATCH})
+    NIGHT_EYE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    NIGHT_EYE_VERSION_TWEAK=${PROJECT_VERSION_TWEAK})
 target_compile_options(NightEye PRIVATE /utf-8 /Zc:preprocessor /permissive- /W4 /WX /wd4200 /wd4201)
 target_link_libraries(NightEye PRIVATE CommonLibSSE nlohmann_json::nlohmann_json imgui::imgui D3D11 DXGI dxguid d3dcompiler Comctl32 "${DETOURS_LIBRARY}")
 set_target_properties(NightEye PROPERTIES OUTPUT_NAME NightEye)
@@ -57,8 +63,8 @@ endforeach()
 file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/NightEyeVersion.rc" CONTENT
 "#include <windows.h>
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0
-PRODUCTVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0
+FILEVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},${PROJECT_VERSION_TWEAK}
+PRODUCTVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},${PROJECT_VERSION_TWEAK}
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_DLL
 BEGIN
@@ -67,9 +73,9 @@ BEGIN
         BLOCK \"040904b0\"
         BEGIN
             VALUE \"FileDescription\", \"Truly Night Eye standalone plugin\\0\"
-            VALUE \"FileVersion\", \"${PROJECT_VERSION}.0\\0\"
+            VALUE \"FileVersion\", \"${NIGHT_EYE_VERSION}\\0\"
             VALUE \"ProductName\", \"Truly Night Eye\\0\"
-            VALUE \"ProductVersion\", \"${PROJECT_VERSION}.0\\0\"
+            VALUE \"ProductVersion\", \"${NIGHT_EYE_VERSION}\\0\"
         END
     END
     BLOCK \"VarFileInfo\"

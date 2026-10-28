@@ -1,12 +1,15 @@
 #include "NightEye.h"
+#include "RuntimeCompatibility.h"
 
 namespace
 {
 	constexpr auto kPluginName = "NightEye"sv;
 	constexpr REL::Version kPluginVersion{
-		NIGHT_EYE_VERSION_MAJOR, NIGHT_EYE_VERSION_MINOR, NIGHT_EYE_VERSION_PATCH
+		NIGHT_EYE_VERSION_MAJOR, NIGHT_EYE_VERSION_MINOR, NIGHT_EYE_VERSION_PATCH,
+		NIGHT_EYE_VERSION_TWEAK
 	};
 	constexpr std::array kSupportedHosts{ REL::Version{ 1, 8, 4 },
+		REL::Version{ 1, 9, 1 },
 		REL::Version{ 2, 17, 0 } };
 	constexpr std::size_t kTrampolineBytes = 512;
 	constexpr DWORD kModulePathCharacters = 32768;
@@ -48,6 +51,11 @@ namespace
 			return false;
 		}
 		const auto version = metadata->GetPluginVersion();
+		if (REL::Module::get().version() >= SKSE::RUNTIME_SSE_1_7_99 &&
+			!(metadata->versionIndependenceEx & SKSE::PluginVersionData::kVersionIndependentEx_AddressLibraryV5)) {
+			SKSE::log::warn("The graphics host does not declare support for Skyrim's newer Address Library format. Night Eye remains inactive.");
+			return false;
+		}
 		std::array<wchar_t, kModulePathCharacters> modulePath{};
 		const auto characters = GetModuleFileNameW(
 			module, modulePath.data(), static_cast<DWORD>(modulePath.size()));
@@ -133,13 +141,12 @@ extern "C" __declspec(dllexport) constinit auto SKSEPlugin_Version =
 		version.PluginName(kPluginName);
 		version.PluginVersion(kPluginVersion);
 		version.UsesAddressLibrary();
-		version.UsesNoStructs();
-		version.CompatibleVersions({ SKSE::RUNTIME_SSE_1_6_1170 });
+		version.UsesUpdatedStructs();
+		version.CompatibleVersions(night_eye::kSupportedRuntimes);
 		return version;
 	}();
 
-extern "C" __declspec(dllexport) bool SKSEAPI
-	SKSEPlugin_Query(const SKSE::QueryInterface* skse,
+SKSE_PLUGIN_QUERY(const SKSE::QueryInterface* skse,
 		SKSE::PluginInfo* information)
 {
 	information->infoVersion = SKSE::PluginInfo::kVersion;
@@ -148,17 +155,16 @@ extern "C" __declspec(dllexport) bool SKSEAPI
 	return !skse->IsEditor();
 }
 
-extern "C" __declspec(dllexport) bool SKSEAPI
-	SKSEPlugin_Load(const SKSE::LoadInterface* skse)
+SKSE_PLUGIN_LOAD(const SKSE::LoadInterface* skse)
 {
 	if (!InitializeLog()) {
 		return false;
 	}
-	SKSE::log::info("Truly Night Eye standalone {} loading.",
-		kPluginVersion.string("."));
 	SKSE::Init(skse);
-	if (REL::Module::get().version() != SKSE::RUNTIME_SSE_1_6_1170) {
-		SKSE::log::warn("This beta supports only the verified Skyrim AE 1.6.1170 runtime.");
+	SKSE::log::info("Truly Night Eye {} (main) loading.",
+		kPluginVersion.string("."));
+	if (!night_eye::IsSupportedRuntime(REL::Module::get().version())) {
+		SKSE::log::warn("Skyrim {} has no verified Night Eye rendering integration.", REL::Module::get().version().string("."));
 		return false;
 	}
 	const auto messaging = SKSE::GetMessagingInterface();

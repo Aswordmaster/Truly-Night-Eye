@@ -18,6 +18,7 @@ namespace night_eye
 		using Microsoft::WRL::ComPtr;
 		constexpr std::size_t kMaximumSourceBytes = 4 * 1024 * 1024;
 		constexpr std::size_t kMaximumExpandedBytes = 32 * 1024 * 1024;
+		constexpr std::size_t kSupportedRecipeCount = 6;
 		constexpr std::string_view kPixelProfile = "ps_5_0";
 		constexpr std::string_view kEntryPoint = "main";
 		const std::filesystem::path kAdapterDirectory = L"Data/Shaders/NightEye/Adapter";
@@ -152,7 +153,7 @@ namespace night_eye
 		void LoadRecipes()
 		{
 			const auto document = nlohmann::json::parse(ReadText(kAdapterDirectory / L"Recipes.json"));
-			if (document.at("schema").get<unsigned int>() != 1 || !document.at("recipes").is_array() || document.at("recipes").size() != 4)
+			if (document.at("schema").get<unsigned int>() != 1 || !document.at("recipes").is_array() || document.at("recipes").size() != kSupportedRecipeCount)
 				throw std::runtime_error("Unsupported shader recipe schema");
 			for (const auto& item : document.at("recipes")) {
 				Recipe recipe;

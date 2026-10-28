@@ -183,6 +183,33 @@
         "sample applications and their assets",
         "distribution binaries"
       ]
+    },
+    {
+      "name": "CommonLibSSE-NG",
+      "version": "11.0.0",
+      "sourceLocation": "git+https://github.com/alandtse/CommonLibSSE-NG@94faaed0c60eddd8347767f2d4d29a97c93bde8c",
+      "bundledArchive": "CommonLibSSE-NG-v11.0.0-source.zip",
+      "bundledArchiveSHA256": "70d49c08c32cf650cabcde8261a4b26a01762f3d9b3fb6ccaedd78317e6a1cb5",
+      "bundledArchiveBytes": 5027866,
+      "fileCount": 2776
+    },
+    {
+      "name": "OpenVR",
+      "version": "v1.0.15",
+      "sourceLocation": "git+https://github.com/ValveSoftware/openvr@60eb187801956ad277f1cae6680e3a410ee0873b",
+      "bundledArchive": "OpenVR-60eb1878-source.zip",
+      "bundledArchiveSHA256": "d862150b16fb5a51cc0fc1b6a9fcc77357c2e63df00c9ddf93c4ebc8e4c26dee",
+      "bundledArchiveBytes": 236249,
+      "fileCount": 33
+    },
+    {
+      "name": "MinHook-hde64",
+      "version": "1.3.4",
+      "sourceLocation": "git+https://github.com/TsudaKageyu/minhook@c3fcafdc10146beb5919319d0683e44e3c30d537",
+      "bundledArchive": "MinHook-v1.3.4-source.tar.gz",
+      "bundledArchiveSHA256": "31757833475be039c16359d4e276e718db6ba2ba61a6b870053a112106015822",
+      "bundledArchiveBytes": 29668,
+      "fileCount": 57
     }
   ]
 }
